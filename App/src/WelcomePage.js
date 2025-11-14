@@ -15,10 +15,8 @@ import {
   Eye,
   Heart
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 
 export default function WelcomePage() {
-  const navigate = useNavigate();
   const navigate = useNavigate();
   const [activeFeature, setActiveFeature] = useState(0);
   const [scrollY, setScrollY] = useState(0);

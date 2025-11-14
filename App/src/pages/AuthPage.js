@@ -1,346 +1,422 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { User, Users, Mail, Lock, Phone, MapPin, ArrowLeft } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState } from "react";
+import { motion } from "framer-motion";
+import {
+  User,
+  Users,
+  Mail,
+  Lock,
+  Phone,
+  MapPin,
+  ArrowLeft,
+} from "lucide-react";
+import { useNavigate } from "react-router-dom";
+
+import {
+  getFirestore,
+  collection,
+  query,
+  where,
+  getDocs,
+  addDoc,
+  serverTimestamp,
+} from "firebase/firestore";
+import { app } from "../services/firebase_";
+
+const db = getFirestore(app);
 
 export default function AuthPage() {
   const [userType, setUserType] = useState(null); // 'politician' or 'citizen'
-  const [mode, setMode] = useState('login'); // 'login' or 'signup'
+  const [mode, setMode] = useState("login"); // 'login' or 'signup'
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    name: '',
-    phone: '',
-    constituency: '',
-    party: '',
-    district: ''
+    username: "",
+    email: "",
+    password: "",
+    name: "",
+    phone: "",
+    constituency: "",
+    party: "",
+    district: "",
   });
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    // TODO: Add Firebase authentication here
-    
-    // For now, redirect based on user type
-    if (userType === 'politician') {
-      navigate('/politician-dashboard');
-    } else {
-      navigate('/dashboard');
-    }
-  };
-
   const handleInputChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    setMessage("");
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // User Type Selection Screen
+  // 🔍 Check user exists
+  async function checkIfUserExists(identifier) {
+    const users = collection(db, "users");
+
+    // Check by email
+    let q = query(users, where("email", "==", identifier));
+    let snap = await getDocs(q);
+    if (!snap.empty) return snap.docs[0];
+
+    // Check by username
+    q = query(users, where("username", "==", identifier));
+    snap = await getDocs(q);
+    if (!snap.empty) return snap.docs[0];
+
+    return null;
+  }
+
+  // 🟡 SIGNUP FLOW
+  async function handleSignup() {
+    const {
+      username,
+      email,
+      password,
+      name,
+      phone,
+      constituency,
+      party,
+      district,
+    } = formData;
+
+    if (!username || !email || !password || !name) {
+      setMessage("Fill all required fields.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // Check if email/username already exists
+      const exists = await checkIfUserExists(email) || await checkIfUserExists(username);
+      if (exists) {
+        setMessage("Username or email already registered.");
+        setLoading(false);
+        return;
+      }
+
+      const users = collection(db, "users");
+
+      const payload = {
+        username,
+        email,
+        password, // RAW PASSWORD (you requested this)
+        name,
+        phone,
+        constituency: userType === "politician" ? constituency : null,
+        party: userType === "politician" ? party : null,
+        district: userType === "citizen" ? district : null,
+        userType,
+        createdAt: serverTimestamp(),
+      };
+
+      const docRef = await addDoc(users, payload);
+
+      // Save session to localStorage
+      localStorage.setItem(
+        "belaku_user",
+        JSON.stringify({
+          id: docRef.id,
+          username,
+          userType,
+          name,
+        })
+      );
+
+      // Redirect
+      navigate(userType === "politician" ? "/politician-dashboard" : "/dashboard");
+    } catch (err) {
+      console.error(err);
+      setMessage("Signup failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // 🔵 LOGIN FLOW
+  async function handleLogin() {
+    const { email, username, password } = formData;
+
+    const identifier = email || username;
+
+    if (!identifier || !password) {
+      setMessage("Enter username/email AND password.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const userDoc = await checkIfUserExists(identifier);
+
+      if (!userDoc) {
+        setMessage("User not found.");
+        setLoading(false);
+        return;
+      }
+
+      const data = userDoc.data();
+
+      if (data.password !== password) {
+        setMessage("Incorrect password.");
+        setLoading(false);
+        return;
+      }
+
+      // Save session
+      localStorage.setItem(
+        "belaku_user",
+        JSON.stringify({
+          id: userDoc.id,
+          username: data.username,
+          userType: data.userType,
+          name: data.name,
+        })
+      );
+
+      // Redirect
+      navigate(data.userType === "politician" ? "/politician-dashboard" : "/dashboard");
+    } catch (err) {
+      console.error(err);
+      setMessage("Login failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (mode === "signup") handleSignup();
+    else handleLogin();
+  };
+
+  // 🔶 USER TYPE SELECTION SCREEN
   if (!userType) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-red-950 to-gray-900 text-white flex items-center justify-center p-6">
-        <div className="max-w-5xl w-full">
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-12"
-          >
-            <h1 className="text-5xl font-bold mb-4">
-              Join{' '}
-              <span className="bg-gradient-to-r from-yellow-300 to-red-400 bg-clip-text text-transparent">
-                Belaku
-              </span>
-            </h1>
-            <p className="text-xl text-gray-300">Choose how you want to continue</p>
-          </motion.div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-red-950 to-gray-900 text-white p-6">
+        <div className="max-w-4xl w-full">
+          <h1 className="text-5xl font-bold text-center mb-12">
+            Join{" "}
+            <span className="bg-gradient-to-r from-yellow-300 to-red-400 bg-clip-text text-transparent">
+              Belaku
+            </span>
+          </h1>
 
           <div className="grid md:grid-cols-2 gap-8">
-            {/* Politician Card */}
+            {/* Politician */}
             <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              whileHover={{ scale: 1.03, y: -5 }}
-              onClick={() => setUserType('politician')}
-              className="cursor-pointer p-8 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-3xl border border-white/20 hover:border-yellow-500/50 transition-all"
+              whileHover={{ scale: 1.03 }}
+              onClick={() => setUserType("politician")}
+              className="p-8 bg-white/10 rounded-3xl border border-white/20 cursor-pointer"
             >
-              <div className="w-20 h-20 bg-gradient-to-br from-yellow-400 to-red-500 rounded-2xl flex items-center justify-center mb-6 mx-auto">
+              <div className="w-20 h-20 bg-gradient-to-br from-yellow-400 to-red-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
                 <User className="w-10 h-10 text-white" />
               </div>
-              
-              <h2 className="text-3xl font-bold text-center mb-4">Politician</h2>
-              <p className="text-gray-300 text-center mb-6">
-                Create your profile, share initiatives, engage with constituents, and track your impact
+              <h2 className="text-3xl font-bold text-center mb-3">Politician</h2>
+              <p className="text-gray-300 text-center mb-4">
+                Manage profile, post initiatives & interact with citizens.
               </p>
-
-              <ul className="space-y-3 mb-6">
-                <li className="flex items-center gap-2 text-sm text-gray-300">
-                  <span className="text-yellow-400">✓</span>
-                  Professional dashboard & analytics
-                </li>
-                <li className="flex items-center gap-2 text-sm text-gray-300">
-                  <span className="text-yellow-400">✓</span>
-                  Post initiatives & projects
-                </li>
-                <li className="flex items-center gap-2 text-sm text-gray-300">
-                  <span className="text-yellow-400">✓</span>
-                  Direct citizen engagement
-                </li>
-                <li className="flex items-center gap-2 text-sm text-gray-300">
-                  <span className="text-yellow-400">✓</span>
-                  Track feedback & sentiment
-                </li>
-              </ul>
-
-              <button className="w-full py-3 bg-gradient-to-r from-yellow-500 to-red-500 rounded-xl font-semibold hover:shadow-lg hover:shadow-yellow-500/50 transition-all">
-                Continue as Politician
-              </button>
             </motion.div>
 
-            {/* Citizen Card */}
+            {/* Citizen */}
             <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              whileHover={{ scale: 1.03, y: -5 }}
-              onClick={() => setUserType('citizen')}
-              className="cursor-pointer p-8 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-3xl border border-white/20 hover:border-yellow-500/50 transition-all"
+              whileHover={{ scale: 1.03 }}
+              onClick={() => setUserType("citizen")}
+              className="p-8 bg-white/10 rounded-3xl border border-white/20 cursor-pointer"
             >
-              <div className="w-20 h-20 bg-gradient-to-br from-blue-400 to-purple-500 rounded-2xl flex items-center justify-center mb-6 mx-auto">
+              <div className="w-20 h-20 bg-gradient-to-br from-blue-400 to-purple-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
                 <Users className="w-10 h-10 text-white" />
               </div>
-              
-              <h2 className="text-3xl font-bold text-center mb-4">Citizen</h2>
-              <p className="text-gray-300 text-center mb-6">
-                Stay informed, participate in discussions, track initiatives, and make your voice heard
+              <h2 className="text-3xl font-bold text-center mb-3">Citizen</h2>
+              <p className="text-gray-300 text-center mb-4">
+                Follow government updates, discussions & bills.
               </p>
-
-              <ul className="space-y-3 mb-6">
-                <li className="flex items-center gap-2 text-sm text-gray-300">
-                  <span className="text-blue-400">✓</span>
-                  Track government initiatives
-                </li>
-                <li className="flex items-center gap-2 text-sm text-gray-300">
-                  <span className="text-blue-400">✓</span>
-                  Participate in discussions
-                </li>
-                <li className="flex items-center gap-2 text-sm text-gray-300">
-                  <span className="text-blue-400">✓</span>
-                  Find your candidates
-                </li>
-                <li className="flex items-center gap-2 text-sm text-gray-300">
-                  <span className="text-blue-400">✓</span>
-                  Provide feedback on bills
-                </li>
-              </ul>
-
-              <button className="w-full py-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl font-semibold hover:shadow-lg hover:shadow-blue-500/50 transition-all">
-                Continue as Citizen
-              </button>
             </motion.div>
           </div>
-
-          <motion.button
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-            onClick={() => navigate('/')}
-            className="mt-8 mx-auto flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Home
-          </motion.button>
         </div>
       </div>
     );
   }
 
-  // Login/Signup Form
+  // 🔷 AUTH FORM (LOGIN / SIGNUP)
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-red-950 to-gray-900 text-white flex items-center justify-center p-6">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="max-w-md w-full"
+        className="max-w-md w-full bg-white/10 p-8 rounded-3xl border border-white/20 backdrop-blur-xl"
       >
-        <div className="bg-white/10 backdrop-blur-xl rounded-3xl border border-white/20 p-8">
-          
-          {/* Header */}
-          <div className="text-center mb-8">
-            <div className={`w-20 h-20 mx-auto mb-4 rounded-2xl flex items-center justify-center ${
-              userType === 'politician' 
-                ? 'bg-gradient-to-br from-yellow-400 to-red-500' 
-                : 'bg-gradient-to-br from-blue-400 to-purple-500'
-            }`}>
-              {userType === 'politician' ? <User className="w-10 h-10" /> : <Users className="w-10 h-10" />}
+        <div className="text-center mb-8">
+          <div
+            className={`w-20 h-20 mx-auto mb-4 rounded-2xl flex items-center justify-center ${
+              userType === "politician"
+                ? "bg-gradient-to-br from-yellow-400 to-red-500"
+                : "bg-gradient-to-br from-blue-400 to-purple-500"
+            }`}
+          >
+            {userType === "politician" ? <User size={40} /> : <Users size={40} />}
+          </div>
+          <h2 className="text-3xl font-bold mb-2">
+            {mode === "login" ? "Welcome Back" : "Create Account"}
+          </h2>
+          <p className="text-gray-300">
+            {userType === "politician" ? "Politician Portal" : "Citizen Portal"}
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+
+          {/* Username only for signup */}
+          {mode === "signup" && (
+            <div>
+              <label className="text-sm mb-1 block">Username</label>
+              <input
+                className="w-full p-3 bg-white/5 border border-white/20 rounded-xl"
+                placeholder="Choose a username"
+                name="username"
+                value={formData.username}
+                onChange={handleInputChange}
+                required
+              />
             </div>
-            <h2 className="text-3xl font-bold mb-2">
-              {mode === 'login' ? 'Welcome Back' : 'Create Account'}
-            </h2>
-            <p className="text-gray-300">
-              {userType === 'politician' ? 'Politician Portal' : 'Citizen Portal'}
-            </p>
+          )}
+
+          {/* Email */}
+          <div>
+            <label className="text-sm mb-1 block">Email</label>
+            <input
+              type="email"
+              name="email"
+              className="w-full p-3 bg-white/5 border border-white/20 rounded-xl"
+              placeholder="Enter your email"
+              value={formData.email}
+              onChange={handleInputChange}
+              required
+            />
           </div>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            
-            {mode === 'signup' && (
+          {/* Password */}
+          <div>
+            <label className="text-sm mb-1 block">Password</label>
+            <input
+              type="password"
+              name="password"
+              className="w-full p-3 bg-white/5 border border-white/20 rounded-xl"
+              placeholder="Enter password"
+              value={formData.password}
+              onChange={handleInputChange}
+              required
+            />
+          </div>
+
+          {mode === "signup" && (
+            <>
+              {/* Name */}
               <div>
-                <label className="block text-sm font-medium mb-2 text-gray-300">Full Name</label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-yellow-500 transition-all"
-                    placeholder="Enter your full name"
-                    required
-                  />
-                </div>
-              </div>
-            )}
-
-            <div>
-              <label className="block text-sm font-medium mb-2 text-gray-300">Email</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <label className="text-sm mb-1 block">Full Name</label>
                 <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
+                  name="name"
+                  className="w-full p-3 bg-white/5 border border-white/20 rounded-xl"
+                  placeholder="Full name"
+                  value={formData.name}
                   onChange={handleInputChange}
-                  className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-yellow-500 transition-all"
-                  placeholder="Enter your email"
                   required
                 />
               </div>
-            </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-2 text-gray-300">Password</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              {/* Phone */}
+              <div>
+                <label className="text-sm mb-1 block">Phone Number</label>
                 <input
-                  type="password"
-                  name="password"
-                  value={formData.password}
+                  name="phone"
+                  className="w-full p-3 bg-white/5 border border-white/20 rounded-xl"
+                  placeholder="Phone"
+                  value={formData.phone}
                   onChange={handleInputChange}
-                  className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-yellow-500 transition-all"
-                  placeholder="Enter your password"
                   required
                 />
               </div>
-            </div>
 
-            {mode === 'signup' && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-gray-300">Phone Number</label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              {/* Politician fields */}
+              {userType === "politician" && (
+                <>
+                  <div>
+                    <label className="text-sm mb-1 block">Constituency</label>
                     <input
-                      type="tel"
-                      name="phone"
-                      value={formData.phone}
+                      name="constituency"
+                      className="w-full p-3 bg-white/5 border border-white/20 rounded-xl"
+                      placeholder="Your constituency"
+                      value={formData.constituency}
                       onChange={handleInputChange}
-                      className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-yellow-500 transition-all"
-                      placeholder="Enter your phone number"
                       required
                     />
                   </div>
-                </div>
 
-                {userType === 'politician' ? (
-                  <>
-                    <div>
-                      <label className="block text-sm font-medium mb-2 text-gray-300">Constituency</label>
-                      <div className="relative">
-                        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                        <input
-                          type="text"
-                          name="constituency"
-                          value={formData.constituency}
-                          onChange={handleInputChange}
-                          className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-yellow-500 transition-all"
-                          placeholder="Your constituency"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium mb-2 text-gray-300">Political Party</label>
-                      <input
-                        type="text"
-                        name="party"
-                        value={formData.party}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-yellow-500 transition-all"
-                        placeholder="Your political party"
-                        required
-                      />
-                    </div>
-                  </>
-                ) : (
                   <div>
-                    <label className="block text-sm font-medium mb-2 text-gray-300">District</label>
-                    <div className="relative">
-                      <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                      <input
-                        type="text"
-                        name="district"
-                        value={formData.district}
-                        onChange={handleInputChange}
-                        className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-yellow-500 transition-all"
-                        placeholder="Your district"
-                        required
-                      />
-                    </div>
+                    <label className="text-sm mb-1 block">Political Party</label>
+                    <input
+                      name="party"
+                      className="w-full p-3 bg-white/5 border border-white/20 rounded-xl"
+                      placeholder="Your party"
+                      value={formData.party}
+                      onChange={handleInputChange}
+                      required
+                    />
                   </div>
-                )}
-              </>
-            )}
+                </>
+              )}
 
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              type="submit"
-              className={`w-full py-3 rounded-xl font-semibold transition-all ${
-                userType === 'politician'
-                  ? 'bg-gradient-to-r from-yellow-500 to-red-500 hover:shadow-lg hover:shadow-yellow-500/50'
-                  : 'bg-gradient-to-r from-blue-500 to-purple-500 hover:shadow-lg hover:shadow-blue-500/50'
-              }`}
-            >
-              {mode === 'login' ? 'Sign In' : 'Create Account'}
-            </motion.button>
-          </form>
+              {/* Citizen fields */}
+              {userType === "citizen" && (
+                <div>
+                  <label className="text-sm mb-1 block">District</label>
+                  <input
+                    name="district"
+                    className="w-full p-3 bg-white/5 border border-white/20 rounded-xl"
+                    placeholder="Your district"
+                    value={formData.district}
+                    onChange={handleInputChange}
+                    required
+                  />
+                </div>
+              )}
+            </>
+          )}
 
-          {/* Toggle Login/Signup */}
-          <div className="mt-6 text-center">
-            <button
-              onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
-              className="text-gray-300 hover:text-white transition-colors"
-            >
-              {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
-              <span className="text-yellow-400 font-semibold">
-                {mode === 'login' ? 'Sign Up' : 'Sign In'}
-              </span>
-            </button>
-          </div>
-
-          {/* Back Button */}
+          {/* Submit Button */}
           <button
-            onClick={() => setUserType(null)}
-            className="mt-4 w-full flex items-center justify-center gap-2 text-gray-400 hover:text-white transition-colors"
+            disabled={loading}
+            className={`w-full py-3 mt-2 rounded-xl font-semibold transition-all ${
+              userType === "politician"
+                ? "bg-gradient-to-r from-yellow-500 to-red-500"
+                : "bg-gradient-to-r from-blue-500 to-purple-500"
+            }`}
           >
-            <ArrowLeft className="w-4 h-4" />
-            Choose Different Account Type
+            {loading ? "Processing..." : mode === "login" ? "Sign In" : "Create Account"}
           </button>
-        </div>
+
+          {/* Error Message */}
+          {message && (
+            <p className="text-red-400 text-center pt-2">{message}</p>
+          )}
+        </form>
+
+        {/* Toggle Login <-> Signup */}
+        <p className="text-center mt-6">
+          {mode === "login" ? "Don't have an account?" : "Already have an account?"}
+          <span
+            onClick={() => setMode(mode === "login" ? "signup" : "login")}
+            className="text-yellow-400 ml-1 cursor-pointer"
+          >
+            {mode === "login" ? "Sign Up" : "Sign In"}
+          </span>
+        </p>
+
+        <button
+          onClick={() => setUserType(null)}
+          className="mt-4 w-full flex items-center justify-center gap-2 text-gray-400"
+        >
+          <ArrowLeft size={16} /> Back
+        </button>
       </motion.div>
     </div>
   );

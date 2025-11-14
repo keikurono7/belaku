@@ -16,7 +16,7 @@ import {
 } from "firebase/firestore";
 
 import { app } from "../services/firebase_";
-import { compressToWebP } from "../utils/compressImage";
+import { fileToBytes } from "../utils/fileToBytes";
 
 const db = getFirestore(app);
 
@@ -29,162 +29,126 @@ export default function TrialPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
-  const clearForm = () => {
-    setTitle("");
-    setDesc("");
-    setUploader("");
-    setFile(null);
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     if (!title.trim() || !uploader.trim()) {
-      setMessage("Title and uploader name required.");
+      setMessage("Title & uploader required.");
       return;
     }
 
     setLoading(true);
+    setMessage("");
 
     try {
-      let imageBase64 = null;
+      let image_blob = null;
       if (file) {
-        imageBase64 = await compressToWebP(file, 800, 0.7);
+        image_blob = await fileToBytes(file);
       }
 
       const collectionMap = {
         initiative: "initiatives",
         bill: "bills",
-        topic: "discussionTopics",
+        topic: "discussionTopics"
       };
 
       await addDoc(collection(db, collectionMap[type]), {
         title,
-        desc,
-        imageBase64,
-        createdBy: uploader,
-        createdAt: serverTimestamp(),
+        description: desc,
+        image_blob,
+        author: uploader,
+        created_at: serverTimestamp()
       });
 
       setMessage("Uploaded ✔");
-      clearForm();
+      setFile(null);
+      setTitle(""); setDesc(""); setUploader("");
+
     } catch (err) {
       console.error(err);
-      setMessage("Upload failed");
+      setMessage("Upload failed.");
     }
 
     setLoading(false);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-red-950 to-gray-900 p-8 text-white">
+    <div className="min-h-screen p-8 bg-gradient-to-br from-gray-900 via-red-950 to-gray-900 text-white">
       <div className="max-w-3xl mx-auto">
-        <motion.h1
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          className="text-4xl font-bold mb-6"
-        >
-          Trial / Admin Upload
-        </motion.h1>
+
+        <motion.h1 className="text-4xl font-bold mb-6">Trial / Admin Upload</motion.h1>
 
         <form
           onSubmit={handleSubmit}
-          className="space-y-4 bg-white/5 p-6 rounded-2xl border border-white/10"
+          className="bg-white/5 p-6 rounded-2xl border border-white/10 space-y-4"
         >
-          {/* Type Selector */}
+
+          {/* Type selector */}
           <div className="flex gap-3">
-            <button type="button"
-              onClick={() => setType("initiative")}
-              className={`px-4 py-2 rounded-xl flex items-center gap-2 ${
-                type === "initiative"
-                  ? "bg-gradient-to-r from-yellow-500 to-red-500 text-black"
-                  : "bg-white/10"
+            <button type="button" onClick={() => setType("initiative")}
+              className={`px-4 py-2 rounded-xl ${
+                type === "initiative" ? "bg-gradient-to-r from-yellow-500 to-red-500 text-black" : "bg-white/10"
               }`}
             >
               <LayoutDashboard /> Initiative
             </button>
 
-            <button type="button"
-              onClick={() => setType("bill")}
-              className={`px-4 py-2 rounded-xl flex items-center gap-2 ${
-                type === "bill"
-                  ? "bg-gradient-to-r from-yellow-500 to-red-500 text-black"
-                  : "bg-white/10"
+            <button type="button" onClick={() => setType("bill")}
+              className={`px-4 py-2 rounded-xl ${
+                type === "bill" ? "bg-gradient-to-r from-yellow-500 to-red-500 text-black" : "bg-white/10"
               }`}
             >
               <FileText /> Bill
             </button>
 
-            <button type="button"
-              onClick={() => setType("topic")}
-              className={`px-4 py-2 rounded-xl flex items-center gap-2 ${
-                type === "topic"
-                  ? "bg-gradient-to-r from-yellow-500 to-red-500 text-black"
-                  : "bg-white/10"
+            <button type="button" onClick={() => setType("topic")}
+              className={`px-4 py-2 rounded-xl ${
+                type === "topic" ? "bg-gradient-to-r from-yellow-500 to-red-500 text-black" : "bg-white/10"
               }`}
             >
-              <MessageSquare /> Discussion Topic
+              <MessageSquare /> Topic
             </button>
           </div>
 
-          {/* Title */}
-          <div>
-            <label className="text-sm text-gray-300">Title</label>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full p-3 mt-1 rounded-xl bg-white/5 border border-white/10"
-            />
-          </div>
+          {/* Inputs */}
+          <input
+            placeholder="Title"
+            className="p-3 bg-white/10 rounded-xl w-full"
+            value={title} onChange={(e) => setTitle(e.target.value)}
+          />
 
-          {/* Description */}
-          <div>
-            <label className="text-sm text-gray-300">Description</label>
-            <textarea
-              value={desc}
-              onChange={(e) => setDesc(e.target.value)}
-              rows={4}
-              className="w-full p-3 mt-1 rounded-xl bg-white/5 border border-white/10"
-            />
-          </div>
+          <textarea
+            placeholder="Description"
+            className="p-3 bg-white/10 rounded-xl w-full"
+            rows="4"
+            value={desc} onChange={(e) => setDesc(e.target.value)}
+          />
 
-          {/* Uploader */}
-          <div>
-            <label className="text-sm text-gray-300">Uploaded by</label>
-            <input
-              value={uploader}
-              onChange={(e) => setUploader(e.target.value)}
-              className="w-full p-3 mt-1 rounded-xl bg-white/5 border border-white/10"
-            />
-          </div>
+          <input
+            placeholder="Uploaded by"
+            className="p-3 bg-white/10 rounded-xl w-full"
+            value={uploader} onChange={(e) => setUploader(e.target.value)}
+          />
 
-          {/* Image */}
           <div>
-            <label className="text-sm text-gray-300 flex items-center gap-2">
-              Image (optional)
-              <ImageIcon className="w-5 h-5" />
+            <label className="flex items-center gap-2 text-gray-300">
+              <ImageIcon /> Image (optional)
             </label>
-
-            <input
-              type="file"
-              accept="image/*"
+            <input type="file" accept="image/*"
               className="mt-2"
               onChange={(e) => setFile(e.target.files?.[0] || null)}
             />
-
-            {file && (
-              <div className="text-sm mt-2 text-gray-300">Selected: {file.name}</div>
-            )}
+            {file && <p className="text-sm text-gray-400">{file.name}</p>}
           </div>
 
-          {/* Submit */}
           <button
             disabled={loading}
-            className="px-6 py-3 w-full rounded-xl bg-gradient-to-r from-yellow-500 to-red-500 font-semibold"
+            className="px-6 py-3 rounded-xl bg-gradient-to-r from-yellow-500 to-red-500 font-bold w-full"
           >
-            {loading ? "Uploading..." : <><UploadCloud className="inline" /> Upload</>}
+            {loading ? "Uploading..." : <><UploadCloud /> Upload</>}
           </button>
 
-          <p className="text-center text-gray-300">{message}</p>
+          <p className="text-center">{message}</p>
         </form>
       </div>
     </div>

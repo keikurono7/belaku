@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   MessageSquare, 
@@ -17,6 +18,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 
 export default function WelcomePage() {
+  const navigate = useNavigate();
   const navigate = useNavigate();
   const [activeFeature, setActiveFeature] = useState(0);
   const [scrollY, setScrollY] = useState(0);
@@ -72,6 +74,10 @@ export default function WelcomePage() {
     { label: "Bills Discussed", value: "450+", icon: Shield },
     { label: "Engagement Rate", value: "87%", icon: Heart }
   ];
+
+  const handleExplorePlatform = () => {
+    navigate('/dashboard');
+};
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-red-950 to-gray-900 text-white overflow-hidden">

@@ -1,168 +1,292 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { 
+  LayoutDashboard, 
+  MessageSquare, 
+  Search, 
+  Vote, 
+  BarChart3, 
+  Users, 
+  Shield,
+  ChevronRight,
+  Sparkles,
+  TrendingUp,
+  Eye,
+  Heart
+} from 'lucide-react';
 
-const MCQPage = () => {
-  const [questions, setQuestions] = useState([]);
-  const [answers, setAnswers] = useState({});
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [submitted, setSubmitted] = useState(false);
+export default function WelcomePage() {
+  const [activeFeature, setActiveFeature] = useState(0);
+  const [scrollY, setScrollY] = useState(0);
 
   useEffect(() => {
-    fetch("http://localhost:8000/questions")
-      .then((res) => res.json())
-      .then(setQuestions)
-      .catch(console.error);
+    const handleScroll = () => setScrollY(window.scrollY);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const currentQuestion = questions[currentIndex];
-  const selected = answers[currentIndex] || [];
-
-  const handleSingleChoice = (selectedOption) => {
-    setAnswers({ ...answers, [currentIndex]: [selectedOption] });
-  };
-
-  const handleMultiChoice = (selectedOption) => {
-    const current = answers[currentIndex] || [];
-    const exists = current.includes(selectedOption);
-    const question = questions[currentIndex];
-
-    let updated;
-    if (exists) {
-      updated = current.filter((s) => s !== selectedOption);
-    } else if (!exists && (!question.maxSelections || current.length < question.maxSelections)) {
-      updated = [...current, selectedOption];
-    } else {
-      updated = current;
+  const features = [
+    {
+      icon: LayoutDashboard,
+      title: "Interactive Dashboard",
+      description: "Explore planned initiatives, bills passed, and ongoing public discussions in real-time",
+      color: "from-yellow-400 to-amber-500"
+    },
+    {
+      icon: MessageSquare,
+      title: "Open Discussion Spaces",
+      description: "Department-wise channels for direct engagement with officials and policy feedback",
+      color: "from-red-500 to-rose-600"
+    },
+    {
+      icon: Search,
+      title: "Smart Search",
+      description: "Unified search for politicians and departments with instant access to projects and records",
+      color: "from-amber-400 to-orange-500"
+    },
+    {
+      icon: Vote,
+      title: "Election Mode",
+      description: "Booth-wise candidate lists, experience, and track records for informed voting",
+      color: "from-yellow-500 to-red-500"
+    },
+    {
+      icon: BarChart3,
+      title: "Public Feedback & Polling",
+      description: "Vote, comment, and suggest improvements on government initiatives",
+      color: "from-red-400 to-amber-500"
+    },
+    {
+      icon: TrendingUp,
+      title: "Data Dashboard for Officials",
+      description: "Analytics on citizen sentiment, engagement, and feedback for better decisions",
+      color: "from-yellow-600 to-red-400"
     }
+  ];
 
-    setAnswers({ ...answers, [currentIndex]: updated });
-  };
-
-  const handleNext = () => {
-    if (currentIndex < questions.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-    }
-  };
-
-  const handleSubmit = async () => {
-    const payload = {};
-    questions.forEach((q, idx) => {
-      payload[q.id] = answers[idx] || [];
-    });
-
-    try {
-      const res = await fetch("http://localhost:8000/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ answers: payload }),
-      });
-
-      if (res.ok) {
-        setSubmitted(true);
-        alert("✅ Submitted successfully!");
-      } else {
-        throw new Error("Submission failed");
-      }
-    } catch (error) {
-      console.error("Error saving response:", error);
-      alert("❌ Failed to submit. Try again.");
-    }
-  };
-
-  const getProgressPercent = () =>
-    ((currentIndex + 1) / questions.length) * 100;
-
-  if (submitted) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-2xl">
-        ✅ Thank you for completing the quiz!
-      </div>
-    );
-  }
+  const stats = [
+    { label: "Active Citizens", value: "2.5M+", icon: Users },
+    { label: "Initiatives Tracked", value: "1,200+", icon: Eye },
+    { label: "Bills Discussed", value: "450+", icon: Shield },
+    { label: "Engagement Rate", value: "87%", icon: Heart }
+  ];
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
-      <div className="max-w-3xl mx-auto">
-        <h1 className="text-3xl font-bold text-center mb-6">🧠 ರಸಪ್ರಶ್ನೆ</h1>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-red-950 to-gray-900 text-white overflow-hidden">
+      {/* Animated Background Elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <motion.div
+          animate={{ 
+            scale: [1, 1.2, 1],
+            rotate: [0, 90, 0],
+            opacity: [0.03, 0.06, 0.03]
+          }}
+          transition={{ duration: 20, repeat: Infinity }}
+          className="absolute -top-1/2 -right-1/2 w-full h-full bg-gradient-to-br from-yellow-500 to-transparent rounded-full blur-3xl"
+        />
+        <motion.div
+          animate={{ 
+            scale: [1.2, 1, 1.2],
+            rotate: [90, 0, 90],
+            opacity: [0.03, 0.06, 0.03]
+          }}
+          transition={{ duration: 25, repeat: Infinity }}
+          className="absolute -bottom-1/2 -left-1/2 w-full h-full bg-gradient-to-tr from-red-600 to-transparent rounded-full blur-3xl"
+        />
+      </div>
 
-        {/* Progress bar */}
-        <div className="w-full bg-gray-300 rounded-full h-3 mb-6">
-          <div
-            className="bg-blue-600 h-3 rounded-full transition-all duration-300"
-            style={{ width: `${getProgressPercent()}%` }}
-          ></div>
-        </div>
-
-        {currentQuestion && (
-          <div className="bg-white shadow rounded p-4 mb-6">
-            <h2 className="text-xl font-semibold mb-3">{currentQuestion.text}</h2>
-            {currentQuestion.canSkip && (
-              <p className="text-sm text-gray-500 mb-2">Skippable</p>
-            )}
-            <div className="space-y-2">
-              {currentQuestion.options.map((opt, oIdx) => {
-                const isSelected = selected.includes(opt.label);
-                const isMulti = currentQuestion.type === "multi_choice";
-
-                return (
-                  <button
-                    key={oIdx}
-                    className={`w-full flex items-center gap-3 border rounded px-4 py-2 text-left ${
-                      isSelected
-                        ? "bg-blue-100 border-blue-500"
-                        : "bg-white hover:bg-gray-100"
-                    }`}
-                    onClick={() =>
-                      isMulti
-                        ? handleMultiChoice(opt.label)
-                        : handleSingleChoice(opt.label)
-                    }
-                  >
-                    {opt.icon && (
-                      <i className={`${opt.icon} text-lg w-6 text-gray-700`}></i>
-                    )}
-                    <span>{opt.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {currentQuestion.type === "multi_choice" && currentQuestion.maxSelections && (
-              <p className="text-sm text-gray-500 mt-2">
-                Max selections allowed: {currentQuestion.maxSelections}
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Navigation Buttons */}
-        <div className="flex justify-between mt-6">
-          <button
-            onClick={() => setCurrentIndex(Math.max(currentIndex - 1, 0))}
-            disabled={currentIndex === 0}
-            className="bg-gray-300 px-4 py-2 rounded shadow disabled:opacity-50"
+      {/* Hero Section */}
+      <div className="relative">
+        <nav className="container mx-auto px-6 py-6 flex justify-between items-center">
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="flex items-center space-x-3"
           >
-            ⬅️ Back
-          </button>
+            <div className="w-12 h-12 bg-gradient-to-br from-yellow-400 to-red-500 rounded-xl flex items-center justify-center">
+              <Sparkles className="w-7 h-7 text-white" />
+            </div>
+            <span className="text-3xl font-bold bg-gradient-to-r from-yellow-400 to-red-500 bg-clip-text text-transparent">
+              Belaku
+            </span>
+          </motion.div>
+          <motion.button
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-red-500 rounded-full font-semibold hover:shadow-2xl hover:shadow-yellow-500/50 transition-all"
+          >
+            Get Started
+          </motion.button>
+        </nav>
 
-          {currentIndex === questions.length - 1 ? (
-            <button
-              onClick={handleSubmit}
-              className="bg-green-600 text-white px-6 py-2 rounded-lg shadow hover:bg-green-700 transition"
+        <div className="container mx-auto px-6 pt-20 pb-32">
+          <div className="max-w-5xl mx-auto text-center">
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8 }}
             >
-              ✅ Submit
-            </button>
-          ) : (
-            <button
-              onClick={handleNext}
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg shadow hover:bg-blue-700 transition"
+              
+              
+              <h1 className="text-6xl md:text-7xl font-bold mb-6 leading-tight">
+                Reimagining{' '}
+                <span className="bg-gradient-to-r from-yellow-300 via-amber-400 to-red-400 bg-clip-text text-transparent">
+                  Governance
+                </span>
+                <br />
+                for Karnataka
+              </h1>
+              
+              <p className="text-xl md:text-2xl text-gray-300 mb-12 max-w-3xl mx-auto leading-relaxed">
+                A participatory, data-driven system where citizens and government collaborate in real-time to shape the state's progress through transparency and digital engagement.
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <motion.button
+                  whileHover={{ scale: 1.05, y: -2 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="px-8 py-4 bg-gradient-to-r from-yellow-500 to-red-500 rounded-full font-bold text-lg flex items-center justify-center space-x-2 hover:shadow-2xl hover:shadow-yellow-500/50 transition-all"
+                >
+                  <span>Explore Platform</span>
+                  <ChevronRight className="w-5 h-5" />
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05, y: -2 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="px-8 py-4 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full font-bold text-lg hover:bg-white/20 transition-all"
+                >
+                  Watch Demo
+                </motion.button>
+              </div>
+            </motion.div>
+
+            {/* Stats */}
+            <motion.div 
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-24"
             >
-              Next ➡️
-            </button>
-          )}
+              {stats.map((stat, idx) => (
+                <motion.div
+                  key={idx}
+                  whileHover={{ scale: 1.05, y: -5 }}
+                  className="p-6 bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-lg rounded-2xl border border-white/10"
+                >
+                  <stat.icon className="w-8 h-8 text-yellow-400 mb-3 mx-auto" />
+                  <div className="text-3xl font-bold bg-gradient-to-r from-yellow-300 to-red-400 bg-clip-text text-transparent mb-1">
+                    {stat.value}
+                  </div>
+                  <div className="text-sm text-gray-400">{stat.label}</div>
+                </motion.div>
+              ))}
+            </motion.div>
+          </div>
         </div>
       </div>
+
+      {/* Features Section */}
+      <div className="relative py-32 bg-gradient-to-b from-transparent via-black/30 to-transparent">
+        <div className="container mx-auto px-6">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-20"
+          >
+            <h2 className="text-5xl font-bold mb-6">
+              Powerful{' '}
+              <span className="bg-gradient-to-r from-yellow-300 to-red-400 bg-clip-text text-transparent">
+                Features
+              </span>
+            </h2>
+            <p className="text-xl text-gray-400 max-w-2xl mx-auto">
+              AI-powered insights and real-time collaboration tools designed for modern governance
+            </p>
+          </motion.div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {features.map((feature, idx) => (
+              <motion.div
+                key={idx}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: idx * 0.1 }}
+                whileHover={{ scale: 1.03, y: -5 }}
+                onHoverStart={() => setActiveFeature(idx)}
+                className="group relative p-8 bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-xl rounded-3xl border border-white/10 hover:border-yellow-500/50 transition-all duration-300 cursor-pointer overflow-hidden"
+              >
+                <div className={`absolute inset-0 bg-gradient-to-br ${feature.color} opacity-0 group-hover:opacity-10 transition-opacity duration-300`} />
+                
+                <div className={`w-16 h-16 bg-gradient-to-br ${feature.color} rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300`}>
+                  <feature.icon className="w-8 h-8 text-white" />
+                </div>
+                
+                <h3 className="text-2xl font-bold mb-4 group-hover:text-yellow-300 transition-colors">
+                  {feature.title}
+                </h3>
+                <p className="text-gray-400 leading-relaxed">
+                  {feature.description}
+                </p>
+
+                <motion.div
+                  initial={{ opacity: 0, x: -10 }}
+                  whileHover={{ opacity: 1, x: 0 }}
+                  className="mt-6 flex items-center text-yellow-400 font-semibold"
+                >
+                  Learn more <ChevronRight className="w-5 h-5 ml-1" />
+                </motion.div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* CTA Section */}
+      <div className="relative py-32">
+        <div className="container mx-auto px-6">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            className="max-w-4xl mx-auto text-center p-12 bg-gradient-to-br from-yellow-500/10 via-red-500/10 to-yellow-500/10 backdrop-blur-xl rounded-3xl border border-yellow-500/20"
+          >
+            <h2 className="text-5xl font-bold mb-6">
+              Shape Karnataka's{' '}
+              <span className="bg-gradient-to-r from-yellow-300 to-red-400 bg-clip-text text-transparent">
+                Future
+              </span>
+            </h2>
+            <p className="text-xl text-gray-300 mb-10 max-w-2xl mx-auto">
+              Join thousands of citizens in building a transparent, collaborative governance system for Karnataka
+            </p>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="px-10 py-5 bg-gradient-to-r from-yellow-500 to-red-500 rounded-full font-bold text-xl shadow-2xl shadow-yellow-500/50 hover:shadow-yellow-500/70 transition-all"
+            >
+              Join Belaku Today
+            </motion.button>
+          </motion.div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <footer className="border-t border-white/10 py-12">
+        <div className="container mx-auto px-6 text-center text-gray-400">
+          <div className="flex items-center justify-center space-x-3 mb-4">
+            <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-red-500 rounded-lg flex items-center justify-center">
+              <Sparkles className="w-6 h-6 text-white" />
+            </div>
+            <span className="text-2xl font-bold text-white">Belaku</span>
+          </div>
+          <p className="mb-2">Empowering Karnataka through transparent governance</p>
+          <p className="text-sm">© 2025 Government of Karnataka. All rights reserved.</p>
+        </div>
+      </footer>
     </div>
   );
-};
-
-export default MCQPage;
+}

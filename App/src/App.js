@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import MCQPage from './WelcomePage';
 import AdminPage from './Admin';
-import Discussion from './pages/Discussion';
+import Discussion from './pages/Discussions';
 import DashboardPage from './pages/Dashboard';
 import TrialPage from './pages/TrialPage';
 

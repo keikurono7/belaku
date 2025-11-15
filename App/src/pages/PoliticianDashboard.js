@@ -43,6 +43,7 @@ import {
 import { app } from "../services/firebase_";
 import { fileToBytes } from "../utils/fileToBytes";
 import { bytesToBase64 } from "../utils/bytesToImage";
+import Discussions from "./Discussions";
 
 const db = getFirestore(app);
 
@@ -104,7 +105,7 @@ export default function PoliticianDashboard() {
     { id: 'initiatives', label: 'Initiatives', icon: Award },
     { id: 'bills', label: 'Bills', icon: FileText },
     { id: 'analytics', label: 'Analytics', icon: TrendingUp },
-    { id: 'messages', label: 'Messages', icon: MessageSquare }
+    { id: 'discussions', label: 'Discussions', icon: MessageSquare }
   ];
 
   // Stats data
@@ -861,6 +862,8 @@ export default function PoliticianDashboard() {
             )}
           </motion.div>
         )}
+
+        {activeTab === "discussions" && <Discussions key="discussions" />}
 
         {/* Other tabs */}
         {!['overview', 'profile', 'initiatives', 'bills'].includes(activeTab) && (

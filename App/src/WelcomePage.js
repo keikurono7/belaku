@@ -159,13 +159,6 @@ export default function WelcomePage() {
                   <span>Explore Platform</span>
                   <ChevronRight className="w-5 h-5" />
                 </motion.button>
-                <motion.button
-                  whileHover={{ scale: 1.05, y: -2 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="px-8 py-4 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full font-bold text-lg hover:bg-white/20 transition-all"
-                >
-                  Watch Demo
-                </motion.button>
               </div>
             </motion.div>
 

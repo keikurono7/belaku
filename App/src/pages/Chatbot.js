@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-const GEMINI_API_KEY = "AIzaSyB5F9tBapGRfjqwYRvChHl_dLRS2vuQdgg";
+const GEMINI_API_KEY = "";
 
 function Chatbot() {
   const [messages, setMessages] = useState([

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   MessageSquare, 
@@ -16,6 +17,7 @@ import {
 } from 'lucide-react';
 
 export default function WelcomePage() {
+  const navigate = useNavigate();
   const [activeFeature, setActiveFeature] = useState(0);
   const [scrollY, setScrollY] = useState(0);
 
@@ -70,6 +72,10 @@ export default function WelcomePage() {
     { label: "Bills Discussed", value: "450+", icon: Shield },
     { label: "Engagement Rate", value: "87%", icon: Heart }
   ];
+
+  const handleExplorePlatform = () => {
+    navigate('/dashboard');
+};
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-red-950 to-gray-900 text-white overflow-hidden">
@@ -145,6 +151,7 @@ export default function WelcomePage() {
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <motion.button
+                onClick={handleExplorePlatform}
                   whileHover={{ scale: 1.05, y: -2 }}
                   whileTap={{ scale: 0.95 }}
                   className="px-8 py-4 bg-gradient-to-r from-yellow-500 to-red-500 rounded-full font-bold text-lg flex items-center justify-center space-x-2 hover:shadow-2xl hover:shadow-yellow-500/50 transition-all"

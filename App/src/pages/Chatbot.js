@@ -1,81 +1,116 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-const GEMINI_API_KEY = "";
+import {
+  getFirestore,
+  collection,
+  getDocs
+} from "firebase/firestore";
+import { app } from "../services/firebase_";
+
+const db = getFirestore(app);
 
 function Chatbot() {
   const [messages, setMessages] = useState([
-    {
-      role: "assistant",
-      text: "Hi! 👋 Ask me Anything!",
-    },
+    { role: "assistant", text: "Hi! 👋 Ask me anything about Karnataka bills & initiatives." },
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [contextData, setContextData] = useState(null);
 
-  // Build full conversation context for Gemini
-  const buildContentsForGemini = (history) =>
-    history.map((m) => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.text }],
-    }));
+  /* ----------------------------------------------------
+      FETCH FIRESTORE DATA (Initiatives + Bills)
+  ---------------------------------------------------- */
+  useEffect(() => {
+    const fetchContext = async () => {
+      try {
+        const iniSnap = await getDocs(collection(db, "initiatives"));
+        const billSnap = await getDocs(collection(db, "bills"));
 
-  const callGemini = async (historyWithUser) => {
-    const contents = buildContentsForGemini(historyWithUser);
+        const initiatives = iniSnap.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        }));
 
-    const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" +
-        GEMINI_API_KEY,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ contents }),
+        const bills = billSnap.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        }));
+
+        setContextData({ initiatives, bills });
+      } catch (err) {
+        console.error(err);
       }
-    );
+    };
 
-    const data = await response.json();
+    fetchContext();
+  }, []);
+
+  /* ----------------------------------------------------
+      OLLAMA CHAT CALL
+  ---------------------------------------------------- */
+  const callOllama = async (history, contextData) => {
+    const systemContext =
+      "You are a helpful assistant for explaining Karnataka government initiatives and bills. " +
+      "Use the following JSON data as your ONLY knowledge base unless the user asks general questions. And do not answer anything outside this context.\n\n" +
+      JSON.stringify(contextData, null, 2);
+
+    const messagesForOllama = [
+      { role: "system", content: systemContext },
+      ...history.map((m) => ({
+        role: m.role === "user" ? "user" : "assistant",
+        content: m.text,
+      })),
+    ];
+
+    const response = await fetch("http://localhost:11434/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "tinyllama:latest",
+        messages: messagesForOllama,
+        stream: false,
+      }),
+    });
 
     if (!response.ok) {
-      throw new Error(data.error?.message || "Error from Gemini API");
+      throw new Error("Ollama API failed");
     }
 
-    const text =
-      data.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "Sorry, I couldn't generate a response.";
-
-    return text;
+    const data = await response.json();
+    return data?.message?.content || "No response from Ollama.";
   };
 
+  /* ----------------------------------------------------
+      SEND MESSAGE
+  ---------------------------------------------------- */
   const handleSend = async () => {
-    const trimmed = input.trim();
-    if (!trimmed || loading) return;
+    if (!input.trim() || loading) return;
 
-    const userMessage = { role: "user", text: trimmed };
-    const historyWithUser = [...messages, userMessage];
+    const newUserMsg = { role: "user", text: input.trim() };
+    const updatedHistory = [...messages, newUserMsg];
 
-    // Update UI immediately
-    setMessages(historyWithUser);
+    setMessages(updatedHistory);
     setInput("");
-    setError("");
     setLoading(true);
+    setError("");
 
     try {
-      // Send full history + new user msg
-      const reply = await callGemini(historyWithUser);
-      const botMessage = { role: "assistant", text: reply };
-      setMessages((prev) => [...prev, botMessage]);
+      const reply = await callOllama(updatedHistory, contextData);
+      const botMsg = { role: "assistant", text: reply };
+      setMessages((prev) => [...prev, botMsg]);
     } catch (err) {
-      console.error(err);
-      setError(err.message || "Something went wrong. Please try again.");
-    } finally {
-      setLoading(false);
+      setError("Failed to connect to local LLM");
     }
+
+    setLoading(false);
   };
 
+  /* ----------------------------------------------------
+      ENTER KEY SEND
+  ---------------------------------------------------- */
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -83,55 +118,31 @@ function Chatbot() {
     }
   };
 
+  /* ----------------------------------------------------
+      UI
+  ---------------------------------------------------- */
   return (
     <div style={styles.page}>
       <div style={styles.chatContainer}>
         <header style={styles.header}>
-          <h1 style={styles.title}>Chatbot</h1>
+          <h1 style={styles.title}>Belaku AI Assistant</h1>
         </header>
 
         <div style={styles.messagesContainer}>
-          {messages.map((m, index) => (
+          {messages.map((m, i) => (
             <div
-              key={index}
+              key={i}
               style={{
                 ...styles.message,
                 ...(m.role === "user" ? styles.userMessage : styles.botMessage),
               }}
             >
               <div style={styles.messageRole}>
-                {m.role === "user" ? "You" : "Bot"}
+                {m.role === "user" ? "You" : "Assistant"}
               </div>
+
               <div style={styles.messageText}>
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={{
-                    code({ inline, className, children, ...props }) {
-                      const isBlock = !inline;
-                      return isBlock ? (
-                        <pre style={styles.codeBlock}>
-                          <code {...props}>{children}</code>
-                        </pre>
-                      ) : (
-                        <code style={styles.inlineCode} {...props}>
-                          {children}
-                        </code>
-                      );
-                    },
-                    a({ children, ...props }) {
-                      return (
-                        <a
-                          {...props}
-                          style={{ color: "#93c5fd", textDecoration: "underline" }}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          {children}
-                        </a>
-                      );
-                    },
-                  }}
-                >
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {m.text}
                 </ReactMarkdown>
               </div>
@@ -140,23 +151,25 @@ function Chatbot() {
 
           {loading && (
             <div style={{ ...styles.message, ...styles.botMessage }}>
-              <div style={styles.messageRole}>Bot</div>
-              <div style={styles.messageText}>Thinking…</div>
+              <div style={styles.messageRole}>Assistant</div>
+              <div>Thinking…</div>
             </div>
           )}
         </div>
 
         {error && <div style={styles.error}>{error}</div>}
 
+        {/* Input Area */}
         <div style={styles.inputArea}>
           <textarea
             style={styles.textarea}
             rows={2}
-            placeholder="Ask something... (Shift+Enter for new line, Enter to send)"
+            placeholder="Ask about initiatives or bills..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
           />
+
           <button
             style={{
               ...styles.button,
@@ -173,151 +186,94 @@ function Chatbot() {
   );
 }
 
+/* ----------------------------------------------------
+      UI STYLES
+---------------------------------------------------- */
 const styles = {
   page: {
     minHeight: "100vh",
-    background: "linear-gradient(135deg, #060b23, #111827)",
+    background: "linear-gradient(135deg, #060b23, #0f172a)",
+    padding: "20px",
     display: "flex",
-    alignItems: "center",
     justifyContent: "center",
-    padding: "16px",
-    boxSizing: "border-box",
-    fontFamily:
-      "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
   },
   chatContainer: {
     width: "100%",
     maxWidth: "800px",
-    backgroundColor: "rgba(15, 23, 42, 0.95)",
-    borderRadius: "18px",
+    background: "rgba(15, 23, 42, 0.9)",
+    borderRadius: "16px",
     padding: "16px",
-    boxSizing: "border-box",
-    boxShadow: "0 20px 40px rgba(0, 0, 0, 0.6)",
+    border: "1px solid rgba(255,255,255,0.1)",
     display: "flex",
     flexDirection: "column",
-    gap: "12px",
-    border: "1px solid rgba(148, 163, 184, 0.2)",
   },
   header: {
-    borderBottom: "1px solid rgba(148, 163, 184, 0.2)",
-    paddingBottom: "8px",
-    marginBottom: "4px",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "baseline",
+    paddingBottom: "6px",
+    borderBottom: "1px solid rgba(255,255,255,0.1)",
+    marginBottom: "10px",
   },
   title: {
     margin: 0,
-    fontSize: "20px",
     color: "#e5e7eb",
-  },
-  subtitle: {
-    fontSize: "12px",
-    color: "#9ca3af",
+    fontSize: "18px",
   },
   messagesContainer: {
     flex: 1,
-    minHeight: "280px",
-    maxHeight: "480px",
     overflowY: "auto",
-    padding: "8px 4px",
+    padding: "8px",
     display: "flex",
     flexDirection: "column",
-    gap: "8px",
+    gap: "10px",
   },
   message: {
     padding: "8px 10px",
-    borderRadius: "12px",
+    borderRadius: "10px",
     maxWidth: "80%",
-    display: "flex",
-    flexDirection: "column",
-    gap: "4px",
-    fontSize: "14px",
-    lineHeight: 1.45,
-    wordBreak: "break-word",
   },
   userMessage: {
+    background: "#2563eb",
+    color: "#fff",
     alignSelf: "flex-end",
-    backgroundColor: "#2563eb",
-    color: "#eff6ff",
   },
   botMessage: {
+    background: "#0f172a",
+    border: "1px solid rgba(255,255,255,0.1)",
+    color: "#fff",
     alignSelf: "flex-start",
-    backgroundColor: "#020617",
-    border: "1px solid rgba(148, 163, 184, 0.3)",
-    color: "#e5e7eb",
   },
   messageRole: {
-    fontSize: "11px",
-    textTransform: "uppercase",
-    letterSpacing: "0.06em",
+    fontSize: "10px",
     opacity: 0.7,
   },
-  messageText: {
-    fontSize: "14px",
-  },
-  codeBlock: {
-    marginTop: "4px",
-    padding: "8px",
-    borderRadius: "8px",
-    backgroundColor: "#020617",
-    border: "1px solid rgba(148, 163, 184, 0.4)",
-    overflowX: "auto",
-    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-    fontSize: "13px",
-  },
-  inlineCode: {
-    padding: "2px 4px",
-    borderRadius: "4px",
-    backgroundColor: "rgba(15, 23, 42, 0.9)",
-    border: "1px solid rgba(148, 163, 184, 0.4)",
-    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-    fontSize: "13px",
-  },
+  messageText: { fontSize: "14px" },
   inputArea: {
     display: "flex",
     gap: "8px",
-    alignItems: "flex-end",
-    paddingTop: "8px",
-    borderTop: "1px solid rgba(148, 163, 184, 0.2)",
+    marginTop: "10px",
   },
   textarea: {
     flex: 1,
-    resize: "none",
-    borderRadius: "12px",
-    border: "1px solid rgba(148, 163, 184, 0.6)",
-    padding: "8px 10px",
-    backgroundColor: "#020617",
-    color: "#e5e7eb",
-    fontFamily: "inherit",
-    fontSize: "14px",
-    outline: "none",
+    padding: "10px",
+    background: "#020617",
+    color: "#fff",
+    borderRadius: "10px",
+    border: "1px solid rgba(255,255,255,0.2)",
   },
   button: {
+    padding: "10px 18px",
+    borderRadius: "20px",
     border: "none",
-    borderRadius: "999px",
-    padding: "8px 16px",
+    background: "#6366f1",
+    color: "#fff",
     cursor: "pointer",
-    fontSize: "14px",
-    fontWeight: 500,
-    background:
-      "radial-gradient(circle at 0 0, #38bdf8, transparent 60%), radial-gradient(circle at 100% 0, #a855f7, transparent 60%)",
-    color: "#f9fafb",
-    minWidth: "90px",
-    transition: "transform 0.1s ease, box-shadow 0.1s ease, opacity 0.1s ease",
-    boxShadow: "0 10px 20px rgba(15, 23, 42, 0.7)",
   },
-  buttonDisabled: {
-    opacity: 0.5,
-    cursor: "not-allowed",
-    boxShadow: "none",
-  },
+  buttonDisabled: { opacity: 0.5, cursor: "not-allowed" },
   error: {
-    fontSize: "12px",
-    color: "#fecaca",
-    backgroundColor: "rgba(127, 29, 29, 0.5)",
-    padding: "6px 8px",
+    color: "#f87171",
+    background: "rgba(127, 29, 29, 0.3)",
+    padding: "6px",
     borderRadius: "8px",
+    marginBottom: "8px",
   },
 };
 

@@ -151,7 +151,7 @@ export default function WelcomePage() {
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <motion.button
-                onClick={handleExplorePlatform}
+                  onClick={() => navigate('/auth')}
                   whileHover={{ scale: 1.05, y: -2 }}
                   whileTap={{ scale: 0.95 }}
                   className="px-8 py-4 bg-gradient-to-r from-yellow-500 to-red-500 rounded-full font-bold text-lg flex items-center justify-center space-x-2 hover:shadow-2xl hover:shadow-yellow-500/50 transition-all"
@@ -271,6 +271,7 @@ export default function WelcomePage() {
               Join thousands of citizens in building a transparent, collaborative governance system for Karnataka
             </p>
             <motion.button
+              onClick={() => navigate('/auth')}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               className="px-10 py-5 bg-gradient-to-r from-yellow-500 to-red-500 rounded-full font-bold text-xl shadow-2xl shadow-yellow-500/50 hover:shadow-yellow-500/70 transition-all"

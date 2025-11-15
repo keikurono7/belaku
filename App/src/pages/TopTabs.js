@@ -4,6 +4,7 @@ LayoutDashboard,
 FileText,
 Building2,
 MessageSquare,
+Bot,
 } from "lucide-react";
 
 
@@ -13,6 +14,7 @@ const tabs = [
 { id: "booths", label: "Booths", icon: Building2 },
 { id: "discussions", label: "Discussions", icon: MessageSquare },
 { id: "ministers", label: "Ministers", icon: Building2 },
+{ id: "chatbot", label: "Chatbot", icon: Bot },
 ];
 
 

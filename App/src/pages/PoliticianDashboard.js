@@ -81,7 +81,7 @@ export default function PoliticianDashboard() {
     party: '',
     constituency: '',
     post: '',
-    assembly: '',
+    booth: '',
     profileImage: null,
     initiatives: [
       { id: 1, title: '', description: '', image: null },
@@ -149,7 +149,7 @@ export default function PoliticianDashboard() {
             party: data.party || '',
             constituency: data.constituency || '',
             post: data.post || '',
-            assembly: data.assembly || '',
+            booth: data.booth || '',
             schemes: data.schemes || '',
             electionHistory: data.electionHistory || '',
             futurePlans: data.futurePlans || ''
@@ -377,7 +377,7 @@ export default function PoliticianDashboard() {
         party: profileData.party || null,
         constituency: profileData.constituency || null,
         post: profileData.post || null,
-        assembly: profileData.assembly || null,
+        booth: profileData.booth || null,
         schemes: profileData.schemes || null,
         electionHistory: profileData.electionHistory || null,
         futurePlans: profileData.futurePlans || null
@@ -551,7 +551,7 @@ export default function PoliticianDashboard() {
                     <p><strong>Party:</strong> {profileData.party}</p>
                     <p><strong>Constituency:</strong> {profileData.constituency}</p>
                     {profileData.post && <p><strong>Post:</strong> {profileData.post}</p>}
-                    {profileData.assembly && <p><strong>Assembly:</strong> {profileData.assembly}</p>}
+                    {profileData.booth && <p><strong>Booth:</strong> {profileData.booth}</p>}
                   </div>
                 </div>
               </div>
@@ -931,13 +931,13 @@ export default function PoliticianDashboard() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-2">Assembly</label>
+                    <label className="block text-sm font-medium mb-2">Booth No.</label>
                     <input
                       type="text"
-                      name="assembly"
-                      value={profileData.assembly}
+                      name="booth"
+                      value={profileData.booth}
                       onChange={handleInputChange}
-                      placeholder="Assembly name"
+                      placeholder="Booth No."
                       className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500"
                     />
                   </div>

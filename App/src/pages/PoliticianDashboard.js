@@ -487,20 +487,6 @@ export default function PoliticianDashboard() {
             
             <div className="flex items-center gap-4">
               <button 
-                onClick={() => { setUploadType("initiative"); setShowUpload(true); }}
-                className="px-4 py-2 bg-gradient-to-r from-yellow-500 to-red-500 rounded-lg hover:shadow-lg transition-all flex items-center gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                Initiative
-              </button>
-              <button 
-                onClick={() => { setUploadType("bill"); setShowUpload(true); }}
-                className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg hover:shadow-lg transition-all flex items-center gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                Bill
-              </button>
-              <button 
                 onClick={() => setShowEditModal(true)}
                 className="px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 transition-all flex items-center gap-2"
               >
@@ -788,13 +774,6 @@ export default function PoliticianDashboard() {
                 <Award className="w-16 h-16 mx-auto mb-4 text-gray-500" />
                 <h3 className="text-2xl font-bold mb-2">No Initiatives Yet</h3>
                 <p className="text-gray-400 mb-6">Start by creating your first initiative</p>
-                <button 
-                  onClick={() => { setUploadType("initiative"); setShowUpload(true); }}
-                  className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-red-500 rounded-lg hover:shadow-lg transition-all inline-flex items-center gap-2"
-                >
-                  <Plus className="w-5 h-5" />
-                  Create Initiative
-                </button>
               </div>
             )}
           </motion.div>
@@ -851,13 +830,6 @@ export default function PoliticianDashboard() {
                 <FileText className="w-16 h-16 mx-auto mb-4 text-gray-500" />
                 <h3 className="text-2xl font-bold mb-2">No Bills Yet</h3>
                 <p className="text-gray-400 mb-6">Start by creating your first bill</p>
-                <button 
-                  onClick={() => { setUploadType("bill"); setShowUpload(true); }}
-                  className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg hover:shadow-lg transition-all inline-flex items-center gap-2"
-                >
-                  <Plus className="w-5 h-5" />
-                  Create Bill
-                </button>
               </div>
             )}
           </motion.div>

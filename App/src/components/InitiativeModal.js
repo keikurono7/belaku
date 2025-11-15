@@ -1,102 +1,121 @@
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { X, ThumbsUp, ThumbsDown } from "lucide-react";
-import { getFirestore, doc, runTransaction } from "firebase/firestore";
+import { X, ThumbsUp, ThumbsDown, Send } from "lucide-react";
+import {
+  getFirestore,
+  doc,
+  runTransaction,
+  collection,
+  addDoc,
+  serverTimestamp,
+  query,
+  orderBy,
+  onSnapshot
+} from "firebase/firestore";
+
 import { app } from "../services/firebase_";
 import { bytesToBase64 } from "../utils/bytesToImage";
 
 const db = getFirestore(app);
 
-/**
- * Props:
- *  - item: Firestore doc data object (must include id, votes, image_blob, created_at, author, description, title)
- *  - onClose: function
- */
 export default function InitiativeModal({ item, onClose }) {
-  const session = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("belaku_user") || "null") : null;
+  const session =
+    typeof window !== "undefined"
+      ? JSON.parse(localStorage.getItem("belaku_user") || "null")
+      : null;
+
   const username = session?.username || null;
 
   const [score, setScore] = useState(item.votes || 0);
-  const [userVote, setUserVote] = useState(0); // -1 | 0 | 1
+  const [userVote, setUserVote] = useState(0);
   const [loading, setLoading] = useState(false);
 
+  // comments
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState("");
+
+  /* Load comments live */
   useEffect(() => {
-    setScore(item.votes || 0);
-    // fetch user's vote once (non-transactional read)
-    if (!username) {
-      setUserVote(0);
-      return;
-    }
+    const q = query(
+      collection(db, "initiatives", item.id, "comments"),
+      orderBy("created_at", "asc")
+    );
 
-    const voteRef = doc(db, "initiatives", item.id, "votes", username);
-    // quick fetch
-    voteRef && fetch(voteRef); // placeholder so eslint no-unused
-    (async () => {
-      try {
-        const snap = await voteRef.get?.() /* guard in case old sdk */; 
-      } catch (e) {
-        /* ignore - we'll use transaction when voting */
-      }
+    const unsub = onSnapshot(q, (snap) => {
+      setComments(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
 
-      // Instead use get via runTransaction with a no-op to get latest user vote
-      try {
-        await runTransaction(db, async (tx) => {
-          const voteSnap = await tx.get(voteRef);
-          if (voteSnap.exists()) setUserVote(voteSnap.data().vote || 0);
-          else setUserVote(0);
-        });
-      } catch (err) {
-        // ignore
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => unsub();
   }, [item.id]);
 
-  // transaction-based vote handler (reddit behavior)
+  /* Load user's previous vote */
+  useEffect(() => {
+    if (!username) return;
+
+    const voteRef = doc(db, "initiatives", item.id, "votes", username);
+
+    (async () => {
+      try {
+        await runTransaction(db, async (tx) => {
+          const snap = await tx.get(voteRef);
+          setUserVote(snap.exists() ? snap.data().vote : 0);
+        });
+      } catch {}
+    })();
+  }, [item.id]);
+
+  /* Handle Voting */
   const handleVote = async (value) => {
-    if (!username) {
-      alert("Please login to vote");
-      return;
-    }
-    if (![1, -1].includes(value)) return;
+    if (!username) return alert("Login to vote.");
 
     setLoading(true);
+
     const initiativeRef = doc(db, "initiatives", item.id);
     const voteRef = doc(db, "initiatives", item.id, "votes", username);
 
     try {
       await runTransaction(db, async (tx) => {
-        const initiativeSnap = await tx.get(initiativeRef);
-        if (!initiativeSnap.exists()) throw new Error("Item missing");
+        const snap = await tx.get(initiativeRef);
+        if (!snap.exists()) throw new Error("Missing post");
 
         const voteSnap = await tx.get(voteRef);
+        const oldVote = voteSnap.exists() ? voteSnap.data().vote : 0;
 
-        const oldVote = voteSnap.exists() ? (voteSnap.data().vote || 0) : 0;
         let newVote = value;
-        // clicking the same vote removes it (unvote)
         if (oldVote === value) newVote = 0;
 
         const delta = newVote - oldVote;
-        const currentTotal = initiativeSnap.data().votes || 0;
-        const newTotal = currentTotal + delta;
+        const newTotal = (snap.data().votes || 0) + delta;
 
-        // update user's vote doc and parent votes atomically
         tx.set(voteRef, { vote: newVote });
         tx.update(initiativeRef, { votes: newTotal });
 
-        // reflect in UI state after transaction completes
-        setUserVote(newVote);
         setScore(newTotal);
+        setUserVote(newVote);
       });
     } catch (err) {
-      console.error("Transaction failed:", err);
-      alert("Vote failed, try again");
+      console.error(err);
+      alert("Vote error");
     } finally {
       setLoading(false);
     }
   };
 
-  const imgSrc = item.image_blob ? bytesToBase64(item.image_blob) : null;
+  /* Add comment */
+  const handleComment = async () => {
+    if (!newComment.trim()) return;
+    if (!username) return alert("Login to comment.");
+
+    await addDoc(collection(db, "initiatives", item.id, "comments"), {
+      text: newComment.trim(),
+      author: username,
+      created_at: serverTimestamp()
+    });
+
+    setNewComment("");
+  };
+
+  const img = item.image_blob ? bytesToBase64(item.image_blob) : null;
 
   return (
     <motion.div
@@ -105,52 +124,87 @@ export default function InitiativeModal({ item, onClose }) {
       animate={{ opacity: 1 }}
     >
       <motion.div
-        className="bg-gray-900 p-6 rounded-2xl max-w-2xl w-full border border-white/10"
+        className="bg-gray-900 p-6 rounded-2xl w-full max-w-2xl border border-white/10"
         initial={{ scale: 0.95 }}
         animate={{ scale: 1 }}
       >
-        <div className="flex justify-between items-start mb-4">
+        {/* HEADER */}
+        <div className="flex justify-between mb-4">
           <div>
             <h2 className="text-2xl font-bold">{item.title}</h2>
-            <div className="text-sm text-gray-400">By {item.author || "—"}</div>
+            <p className="text-gray-400 text-sm">By {item.author}</p>
           </div>
 
-          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg">
-            <X className="w-5 h-5" />
+          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-xl">
+            <X />
           </button>
         </div>
 
-        {imgSrc && (
-          <img src={imgSrc} alt="" className="w-full h-64 object-cover rounded-xl mb-4" />
-        )}
+        {/* IMAGE */}
+        {img && <img src={img} className="w-full h-64 object-cover rounded-xl mb-4" />}
 
+        {/* DESCRIPTION */}
         <p className="text-gray-300 mb-4">{item.description}</p>
 
-        <div className="flex items-center gap-3">
+        {/* VOTING */}
+        <div className="flex items-center gap-3 mb-4">
           <button
             disabled={loading}
             onClick={() => handleVote(1)}
-            className={`px-4 py-2 rounded-xl flex items-center gap-2 ${userVote === 1 ? "bg-green-600" : "bg-white/5 hover:bg-white/10"}`}
+            className={`px-4 py-2 rounded-xl flex items-center gap-2 ${
+              userVote === 1 ? "bg-green-600" : "bg-white/10"
+            }`}
           >
-            <ThumbsUp className="w-5 h-5" /> Upvote
+            <ThumbsUp /> Upvote
           </button>
 
           <button
             disabled={loading}
             onClick={() => handleVote(-1)}
-            className={`px-4 py-2 rounded-xl flex items-center gap-2 ${userVote === -1 ? "bg-red-600" : "bg-white/5 hover:bg-white/10"}`}
+            className={`px-4 py-2 rounded-xl flex items-center gap-2 ${
+              userVote === -1 ? "bg-red-600" : "bg-white/10"
+            }`}
           >
-            <ThumbsDown className="w-5 h-5" /> Downvote
+            <ThumbsDown /> Downvote
           </button>
 
-          <div className="ml-auto text-yellow-300 font-bold">Score: {score}</div>
+          <div className="ml-auto font-bold text-yellow-300">Score: {score}</div>
         </div>
 
-        {item.created_at?.toDate && (
-          <div className="text-xs text-gray-500 mt-4">
-            Posted on {new Date(item.created_at.toDate()).toLocaleString()}
-          </div>
-        )}
+        {/* COMMENTS */}
+        <h3 className="text-lg font-bold mb-2">Comments</h3>
+
+        <div className="max-h-60 overflow-y-auto mb-3 space-y-2 p-2 bg-white/5 rounded-xl border border-white/10">
+          {comments.map((c) => (
+            <div key={c.id} className="p-3 bg-white/10 rounded-xl">
+              <div className="text-yellow-400 text-sm">{c.author}</div>
+              <div>{c.text}</div>
+              <div className="text-gray-500 text-xs mt-1">
+                {c.created_at?.toDate?.() &&
+                  c.created_at.toDate().toLocaleTimeString()}
+              </div>
+            </div>
+          ))}
+          {comments.length === 0 && (
+            <div className="text-gray-400 text-center">No comments yet.</div>
+          )}
+        </div>
+
+        {/* COMMENT INPUT */}
+        <div className="flex gap-2">
+          <input
+            value={newComment}
+            onChange={(e) => setNewComment(e.target.value)}
+            placeholder="Write a comment…"
+            className="flex-1 p-3 bg-white/10 rounded-xl border border-white/10"
+          />
+          <button
+            onClick={handleComment}
+            className="px-4 bg-gradient-to-r from-yellow-500 to-red-500 rounded-xl"
+          >
+            <Send className="w-5 h-5" />
+          </button>
+        </div>
       </motion.div>
     </motion.div>
   );

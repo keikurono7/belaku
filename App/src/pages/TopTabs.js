@@ -12,6 +12,7 @@ const tabs = [
 { id: "bills", label: "Bills", icon: FileText },
 { id: "booths", label: "Booths", icon: Building2 },
 { id: "discussions", label: "Discussions", icon: MessageSquare },
+{ id: "ministers", label: "Ministers", icon: Building2 },
 ];
 
 

@@ -7,6 +7,7 @@ import Initiatives from "./Initiatives";
 import Bills from "./Bills";
 import Booths from "./Booths";
 import Discussions from "./Discussions";
+import Ministers from "./Ministers";
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState("initiatives");
@@ -40,6 +41,7 @@ export default function DashboardPage() {
           {activeTab === "bills" && <Bills key="bills" />}
           {activeTab === "booths" && <Booths key="booths" />}
           {activeTab === "discussions" && <Discussions key="discussions" />}
+          {activeTab === "ministers" && <Ministers key="ministers" />}
         </AnimatePresence>
       </div>
     </div>

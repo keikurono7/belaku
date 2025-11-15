@@ -7,43 +7,27 @@ import { bytesToBase64 } from "../utils/bytesToImage";
 
 const db = getFirestore(app);
 
-/**
- * Props:
- *  - item: Firestore doc data object (must include id, votes, image_blob, created_at, author, description, title)
- *  - onClose: function
- */
-export default function InitiativeModal({ item, onClose }) {
+export default function BillModal({ item, onClose }) {
   const session = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("belaku_user") || "null") : null;
   const username = session?.username || null;
 
   const [score, setScore] = useState(item.votes || 0);
-  const [userVote, setUserVote] = useState(0); // -1 | 0 | 1
+  const [userVote, setUserVote] = useState(0);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     setScore(item.votes || 0);
-    // fetch user's vote once (non-transactional read)
     if (!username) {
       setUserVote(0);
       return;
     }
 
-    const voteRef = doc(db, "initiatives", item.id, "votes", username);
-    // quick fetch
-    voteRef && fetch(voteRef); // placeholder so eslint no-unused
+    const voteRef = doc(db, "bills", item.id, "votes", username);
     (async () => {
       try {
-        const snap = await voteRef.get?.() /* guard in case old sdk */; 
-      } catch (e) {
-        /* ignore - we'll use transaction when voting */
-      }
-
-      // Instead use get via runTransaction with a no-op to get latest user vote
-      try {
         await runTransaction(db, async (tx) => {
-          const voteSnap = await tx.get(voteRef);
-          if (voteSnap.exists()) setUserVote(voteSnap.data().vote || 0);
-          else setUserVote(0);
+          const vSnap = await tx.get(voteRef);
+          setUserVote(vSnap.exists() ? (vSnap.data().vote || 0) : 0);
         });
       } catch (err) {
         // ignore
@@ -52,44 +36,39 @@ export default function InitiativeModal({ item, onClose }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item.id]);
 
-  // transaction-based vote handler (reddit behavior)
   const handleVote = async (value) => {
     if (!username) {
       alert("Please login to vote");
       return;
     }
-    if (![1, -1].includes(value)) return;
-
     setLoading(true);
-    const initiativeRef = doc(db, "initiatives", item.id);
-    const voteRef = doc(db, "initiatives", item.id, "votes", username);
+
+    const billRef = doc(db, "bills", item.id);
+    const voteRef = doc(db, "bills", item.id, "votes", username);
 
     try {
       await runTransaction(db, async (tx) => {
-        const initiativeSnap = await tx.get(initiativeRef);
-        if (!initiativeSnap.exists()) throw new Error("Item missing");
+        const billSnap = await tx.get(billRef);
+        if (!billSnap.exists()) throw new Error("Bill missing");
 
-        const voteSnap = await tx.get(voteRef);
+        const vSnap = await tx.get(voteRef);
+        const oldVote = vSnap.exists() ? (vSnap.data().vote || 0) : 0;
 
-        const oldVote = voteSnap.exists() ? (voteSnap.data().vote || 0) : 0;
         let newVote = value;
-        // clicking the same vote removes it (unvote)
-        if (oldVote === value) newVote = 0;
+        if (oldVote === value) newVote = 0; // unvote
 
         const delta = newVote - oldVote;
-        const currentTotal = initiativeSnap.data().votes || 0;
+        const currentTotal = billSnap.data().votes || 0;
         const newTotal = currentTotal + delta;
 
-        // update user's vote doc and parent votes atomically
         tx.set(voteRef, { vote: newVote });
-        tx.update(initiativeRef, { votes: newTotal });
+        tx.update(billRef, { votes: newTotal });
 
-        // reflect in UI state after transaction completes
         setUserVote(newVote);
         setScore(newTotal);
       });
     } catch (err) {
-      console.error("Transaction failed:", err);
+      console.error("Vote transaction failed:", err);
       alert("Vote failed, try again");
     } finally {
       setLoading(false);
@@ -120,24 +99,22 @@ export default function InitiativeModal({ item, onClose }) {
           </button>
         </div>
 
-        {imgSrc && (
-          <img src={imgSrc} alt="" className="w-full h-64 object-cover rounded-xl mb-4" />
-        )}
+        {imgSrc && <img src={imgSrc} className="w-full h-64 object-cover rounded-xl mb-4" />}
 
         <p className="text-gray-300 mb-4">{item.description}</p>
 
         <div className="flex items-center gap-3">
           <button
-            disabled={loading}
             onClick={() => handleVote(1)}
+            disabled={loading}
             className={`px-4 py-2 rounded-xl flex items-center gap-2 ${userVote === 1 ? "bg-green-600" : "bg-white/5 hover:bg-white/10"}`}
           >
             <ThumbsUp className="w-5 h-5" /> Upvote
           </button>
 
           <button
-            disabled={loading}
             onClick={() => handleVote(-1)}
+            disabled={loading}
             className={`px-4 py-2 rounded-xl flex items-center gap-2 ${userVote === -1 ? "bg-red-600" : "bg-white/5 hover:bg-white/10"}`}
           >
             <ThumbsDown className="w-5 h-5" /> Downvote
